@@ -9,6 +9,7 @@ services:
       DATABASE_PASSWORD: serviceops
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       OTLP_TRACING_ENDPOINT: http://jaeger:4318/v1/traces
+      PROMETHEUS_URL: http://prometheus:9090
     depends_on:
       classifier:
         condition: service_started

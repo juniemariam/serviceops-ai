@@ -44,6 +44,14 @@ management:
     health:
       show-details: when-authorized
   metrics:
+    distribution:
+      percentiles-histogram:
+        # Boot exports only count/sum/max by default, so no _bucket series exists and any
+        # histogram_quantile over HTTP latency returns nothing. Both the telemetry adapter
+        # and the dashboard's latency panel query those buckets.
+        http.server.requests: true
+      slo:
+        http.server.requests: 50ms,200ms,500ms,1s,2s
     tags:
       # Every series carries these, so dashboards can separate environments and replicas.
       application: ${spring.application.name}
@@ -65,6 +73,12 @@ serviceops:
     partitions: ${KAFKA_PARTITIONS:3}
     retries: ${KAFKA_RETRIES:2}
     retry-interval-ms: ${KAFKA_RETRY_INTERVAL_MS:1000}
+  graph:
+    max-depth: ${GRAPH_MAX_DEPTH:5}
+  telemetry:
+    enabled: ${TELEMETRY_ENABLED:true}
+    prometheus-url: ${PROMETHEUS_URL:http://localhost:9090}
+    window: ${TELEMETRY_WINDOW:5m}
   diagnosis:
     # How far back to look for a release that could explain an incident.
     deployment-correlation-window: ${DEPLOYMENT_CORRELATION_WINDOW:PT2H}

@@ -15,3 +15,5 @@ serviceops:
   # No broker in this profile either; ingestion is exercised by tests and the real stack.
   kafka:
     enabled: false
+  telemetry:
+    enabled: false

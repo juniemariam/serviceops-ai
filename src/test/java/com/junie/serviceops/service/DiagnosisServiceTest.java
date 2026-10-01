@@ -8,6 +8,7 @@ import com.junie.serviceops.model.RecommendedAction;
 import com.junie.serviceops.model.Remediation;
 import com.junie.serviceops.observability.ServiceOpsMetrics;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import com.junie.serviceops.telemetry.StubTelemetryAdapter;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.client.RestClient;
 
@@ -20,7 +21,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DiagnosisServiceTest {
 
+    private final ServiceCatalog catalog = new InMemoryServiceCatalog();
     private final ServiceOpsMetrics metrics = new ServiceOpsMetrics(new SimpleMeterRegistry());
+    private final StubTelemetryAdapter telemetry = new StubTelemetryAdapter();
 
     /** Port 65530 is unbound, so the classifier client exercises its local fallback. */
     private final ClassifierClient classifier =
@@ -29,7 +32,7 @@ class DiagnosisServiceTest {
     private final RemediationStore remediationStore = new InMemoryRemediationStore();
     private final DeploymentStore deployments = new InMemoryDeploymentStore();
     private final DiagnosisService service = new DiagnosisService(store, classifier,
-            new InMemoryKnowledgeService(), new DependencyGraphService(), deployments, metrics, Duration.ofHours(2));
+            new InMemoryKnowledgeService(), new DependencyGraphService(catalog, 5), catalog, deployments, telemetry, metrics, Duration.ofHours(2));
     private final RemediationService remediation = new RemediationService(store, remediationStore, metrics);
 
     @Test

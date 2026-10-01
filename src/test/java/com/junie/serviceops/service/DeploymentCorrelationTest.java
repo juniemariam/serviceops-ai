@@ -8,6 +8,7 @@ import com.junie.serviceops.model.Incident;
 import com.junie.serviceops.model.RecommendedAction;
 import com.junie.serviceops.observability.ServiceOpsMetrics;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import com.junie.serviceops.telemetry.StubTelemetryAdapter;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.client.RestClient;
 
@@ -22,15 +23,17 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DeploymentCorrelationTest {
 
+    private final ServiceCatalog catalog = new InMemoryServiceCatalog();
     private final ServiceOpsMetrics metrics = new ServiceOpsMetrics(new SimpleMeterRegistry());
+    private final StubTelemetryAdapter telemetry = new StubTelemetryAdapter();
 
     private final IncidentStore store = new InMemoryIncidentStore();
     private final DeploymentStore deployments = new InMemoryDeploymentStore();
     private final DeploymentIngestService deploymentIngest = new DeploymentIngestService(deployments, metrics);
     private final DiagnosisService diagnosis = new DiagnosisService(store,
             new ClassifierClient(RestClient.builder(), "http://localhost:65530", metrics),
-            new InMemoryKnowledgeService(), new DependencyGraphService(),
-            deployments, metrics, Duration.ofHours(2));
+            new InMemoryKnowledgeService(), new DependencyGraphService(catalog, 5), catalog,
+            deployments, telemetry, metrics, Duration.ofHours(2));
 
     private Incident incident(String service) {
         return diagnosis.create(new Incident(null, "Checkout unavailable", "pods crashlooping",

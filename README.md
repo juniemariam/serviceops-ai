@@ -10,7 +10,8 @@ ServiceOps AI is a Java-based agentic AIOps platform that combines incident-clas
 - Kafka ingestion of alert and deployment events, with idempotent handling and dead letter topics
 - Deployment correlation: a release inside the window becomes ranked evidence and names the root cause
 - pgvector cosine retrieval over a seeded corpus of runbooks, incidents, and service catalog entries
-- Explicit service-dependency graph reasoning for impact analysis
+- Service dependency graph in PostgreSQL with transitive blast-radius and critical-path traversal
+- Prometheus telemetry adapters feeding service and dependency health into diagnosis
 - Diagnosis workflow with likely root cause and recommended actions
 - Approval-gated sandbox remediation endpoint
 - OpenTelemetry traces to Jaeger, Prometheus metrics, provisioned Grafana dashboard, and alert rules
@@ -87,6 +88,29 @@ says so and reports lower confidence rather than asserting a regression it canno
 
 Only the incident's own service is considered. A dependency's release is a weaker signal and
 would need its own ranking rather than being mixed in at equal weight.
+
+## Service graph and telemetry
+
+`services` and `service_dependencies` replace what was a hardcoded three-entry map.
+Traversal runs in both directions because they answer different questions: downstream
+narrows where a root cause might be, upstream is the blast radius that decides priority.
+Edges are marked critical or not, so a non-critical dependency failing affects a caller
+without putting it on the critical path.
+
+Traversal tracks visited nodes rather than assuming a DAG — real topologies have cycles, and
+without that an A→B→A loop would not terminate. Depth is capped and `truncated` reports when
+the cap was hit, so a partial answer is distinguishable from a complete one.
+
+Each service may declare a `telemetry_job`, the Prometheus `job` label to read it by.
+Services without one report *absence* of telemetry rather than health: the seeded business
+services are not really scraped, and reporting them as healthy would be a lie. ServiceOps'
+own components are scraped, which lets the platform diagnose itself.
+
+A diagnosis reads telemetry for the incident's service and its **direct** dependencies only.
+Reading the full transitive tree would make diagnosis cost grow with graph size. Healthy
+readings are omitted so the sick one stands out, and a failing dependency outranks the
+incident's own service, drives the root-cause narrative, and recommends escalation to the
+dependency's owning team rather than a rollback that cannot fix it.
 
 ## Observability
 
@@ -204,6 +228,5 @@ EOF
 
 ## Next production-oriented increments
 
-1. Add a service dependency graph and real telemetry adapters.
+1. Build an offline evaluation set for classification, retrieval, root-cause ranking, and remediation success.
 2. Add Spring AI tool calling with grounded citations.
-3. Build an offline evaluation set for classification, retrieval, root-cause ranking, and remediation success.

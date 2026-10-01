@@ -5,6 +5,7 @@ import com.junie.serviceops.model.Incident;
 import com.junie.serviceops.model.IncidentStatus;
 import com.junie.serviceops.observability.ServiceOpsMetrics;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import com.junie.serviceops.telemetry.StubTelemetryAdapter;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.client.RestClient;
 
@@ -19,13 +20,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class AlertIngestServiceTest {
 
+    private final ServiceCatalog catalog = new InMemoryServiceCatalog();
     private final ServiceOpsMetrics metrics = new ServiceOpsMetrics(new SimpleMeterRegistry());
+    private final StubTelemetryAdapter telemetry = new StubTelemetryAdapter();
 
     private final IncidentStore store = new InMemoryIncidentStore();
     private final DiagnosisService diagnosis = new DiagnosisService(store,
             new ClassifierClient(RestClient.builder(), "http://localhost:65530", metrics),
-            new InMemoryKnowledgeService(), new DependencyGraphService(),
-            new InMemoryDeploymentStore(), metrics, Duration.ofHours(2));
+            new InMemoryKnowledgeService(), new DependencyGraphService(catalog, 5), catalog,
+            new InMemoryDeploymentStore(), telemetry, metrics, Duration.ofHours(2));
     private final AlertIngestService ingest = new AlertIngestService(store, diagnosis, metrics);
 
     private AlertEvent firing(String fingerprint) {
