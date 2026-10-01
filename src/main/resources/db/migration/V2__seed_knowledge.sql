@@ -1,0 +1,25 @@
+-- Seed corpus migrated from the previously hardcoded KnowledgeService.
+-- Embeddings are left NULL and backfilled at startup by KnowledgeIndexer.
+INSERT INTO knowledge_documents (source_id, source_type, service, excerpt) VALUES
+    ('runbook-payment-001', 'RUNBOOK', 'payments',
+     'Check database connection pool saturation and compare latency before and after the latest deployment.'),
+    ('runbook-generic-001', 'RUNBOOK', NULL,
+     'Check recent changes, service health, logs, and dependency availability.'),
+    ('runbook-identity-001', 'RUNBOOK', 'identity',
+     'Authentication failures after a token signing key rotation require refreshing the JWKS cache on every consumer.'),
+    ('runbook-checkout-001', 'RUNBOOK', 'checkout',
+     'Checkout pod crashloops are usually caused by a failed readiness probe against payments; verify the downstream health endpoint first.'),
+    ('incident-1842', 'INCIDENT', 'payments',
+     'Payment API timeouts followed release v2.4.1; rollback restored normal p95 latency.'),
+    ('incident-1907', 'INCIDENT', 'identity',
+     'Users could not log in after an OAuth client secret expired; rotating the secret resolved the outage.'),
+    ('incident-2013', 'INCIDENT', 'checkout',
+     'Checkout availability dropped when payments-db exhausted its connection limit under a traffic spike.'),
+    ('service-payments', 'SERVICE_CATALOG', 'payments',
+     'Owner: platform-reliability. Dependencies: payments-db, identity. Tier 1.'),
+    ('service-checkout', 'SERVICE_CATALOG', 'checkout',
+     'Owner: platform-reliability. Dependencies: payments, fraud, checkout-db. Tier 1.'),
+    ('service-identity', 'SERVICE_CATALOG', 'identity',
+     'Owner: identity-platform. Dependencies: identity-db. Tier 1.'),
+    ('service-fraud', 'SERVICE_CATALOG', 'fraud',
+     'Owner: risk-engineering. Dependencies: fraud-db. Tier 2.');

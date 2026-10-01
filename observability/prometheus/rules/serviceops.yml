@@ -1,0 +1,115 @@
+groups:
+  - name: serviceops-degradation
+    interval: 15s
+    rules:
+      # Liveness comes first, and deliberately does not depend on API traffic. The fallback
+      # counters below can only reveal degradation while requests are flowing, so a classifier
+      # that dies during a quiet period would otherwise stay invisible until the next incident.
+      - alert: ClassifierDown
+        expr: up{job="classifier"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Classifier service is not being scraped"
+          description: >-
+            Every classification will fall back to the Java keyword heuristic and every
+            retrieval to full-text search while this holds, without any request failing.
+
+      # Both external dependencies fail open: the API keeps serving while quietly producing
+      # worse answers. These ratios make that visible whenever traffic exists, at any volume.
+      # They are ratios rather than rate() > 0 so that a low-traffic service still alerts, and
+      # so a single stale request cannot hold the alert open.
+      - alert: ClassifierDegraded
+        expr: |
+          sum(rate(serviceops_classifications_total{model_version="java-fallback-v1"}[10m]))
+            /
+          clamp_min(sum(rate(serviceops_classifications_total[10m])), 0.0001) > 0.2
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Over 20% of classifications are using the local heuristic"
+          description: >-
+            The Python classifier is unreachable or erroring, so incidents are being labelled
+            by the Java keyword fallback. Priorities and assignment groups are less accurate
+            until it recovers. Check the classifier service and its HTTP client timeouts.
+
+      - alert: RetrievalDegraded
+        expr: |
+          sum(rate(serviceops_retrievals_total{mode="keyword"}[10m]))
+            /
+          clamp_min(sum(rate(serviceops_retrievals_total[10m])), 0.0001) > 0.2
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Over 20% of retrievals have fallen back to keyword search"
+          description: >-
+            The embedding service is unreachable, or the corpus has unembedded rows, so
+            diagnoses are grounded on full-text matches instead of vector similarity.
+
+      - alert: NoDeploymentCorrelation
+        expr: |
+          sum(rate(serviceops_diagnoses_total{deployment_correlated="true"}[30m]))
+            /
+          clamp_min(sum(rate(serviceops_diagnoses_total[30m])), 0.0001) < 0.1
+        for: 30m
+        labels:
+          severity: info
+        annotations:
+          summary: "Almost no diagnosis is finding a correlated deployment"
+          description: >-
+            Either releases genuinely are not causing incidents, or the deployment topic has
+            stopped producing. Check that deployment events are still arriving before trusting
+            the "no correlated release" conclusion in diagnoses.
+
+  - name: serviceops-pipeline
+    interval: 15s
+    rules:
+      - alert: AlertIngestionStalled
+        expr: |
+          sum(rate(serviceops_alerts_ingested_total[15m])) == 0
+          and on() (sum(serviceops_alerts_ingested_total) > 0)
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "No alert events have been ingested for 15 minutes"
+          description: >-
+            The consumer previously processed alerts and has now gone quiet. Check consumer
+            group lag and whether the partition is blocked.
+
+      - alert: DiagnosisLatencyHigh
+        expr: |
+          histogram_quantile(0.95, sum(rate(serviceops_diagnosis_duration_seconds_bucket[5m])) by (le)) > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "p95 diagnosis latency above 2s"
+          description: >-
+            Diagnosis fans out to the embedding service, pgvector, and the deployment store.
+            Check which of those is slow before raising the HTTP client timeouts.
+
+      - alert: RemediationRejectionRateHigh
+        expr: |
+          sum(rate(serviceops_remediations_total{status="REJECTED"}[1h]))
+            /
+          clamp_min(sum(rate(serviceops_remediations_total[1h])), 0.0001) > 0.5
+        for: 1h
+        labels:
+          severity: info
+        annotations:
+          summary: "Most recommended actions are being rejected by approvers"
+          description: >-
+            A sustained rejection majority suggests the recommendation logic is proposing
+            actions responders do not trust. Treat as a model quality signal, not an outage.
+
+      - alert: ApiDown
+        expr: up{job="serviceops-api"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "ServiceOps API is not being scraped"

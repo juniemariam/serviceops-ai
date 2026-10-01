@@ -1,0 +1,17 @@
+# Runs the API with no database, using the in-memory stores. Intended for demos and
+# smoke tests only: nothing survives a restart and retrieval is keyword-matched against a
+# small hardcoded corpus rather than the seeded pgvector one.
+spring:
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
+      - org.springframework.boot.autoconfigure.jdbc.DataSourceTransactionManagerAutoConfiguration
+      - org.springframework.boot.autoconfigure.flyway.FlywayAutoConfiguration
+      - org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration
+management:
+  tracing:
+    enabled: false
+serviceops:
+  # No broker in this profile either; ingestion is exercised by tests and the real stack.
+  kafka:
+    enabled: false

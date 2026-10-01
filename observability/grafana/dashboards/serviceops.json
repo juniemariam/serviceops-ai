@@ -1,0 +1,181 @@
+{
+  "uid": "serviceops-overview",
+  "title": "ServiceOps AI — Pipeline Health",
+  "tags": ["serviceops"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "10s",
+  "time": { "from": "now-1h", "to": "now" },
+  "panels": [
+    {
+      "type": "row",
+      "title": "Degradation — are we quietly serving worse answers?",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }
+    },
+    {
+      "type": "timeseries",
+      "title": "Classification source",
+      "description": "java-fallback-v1 means the Python model is unreachable and incidents are being labelled by the keyword heuristic.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 1 },
+      "fieldConfig": {
+        "defaults": { "unit": "reqps", "custom": { "fillOpacity": 25, "stacking": { "mode": "normal" } } },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "java-fallback-v1" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } }]
+          }
+        ]
+      },
+      "targets": [
+        {
+          "expr": "sum by (model_version) (rate(serviceops_classifications_total[5m]))",
+          "legendFormat": "{{model_version}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Retrieval mode",
+      "description": "keyword means the embedding service is unreachable and evidence is no longer ranked by vector similarity.",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 1 },
+      "fieldConfig": {
+        "defaults": { "unit": "reqps", "custom": { "fillOpacity": 25, "stacking": { "mode": "normal" } } },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "keyword" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "orange" } }]
+          }
+        ]
+      },
+      "targets": [
+        {
+          "expr": "sum by (mode) (rate(serviceops_retrievals_total[5m]))",
+          "legendFormat": "{{mode}}"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Ingestion",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 9 }
+    },
+    {
+      "type": "timeseries",
+      "title": "Alert ingestion outcomes",
+      "description": "collapsed = a re-firing alert folded onto an incident that was already open.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 10 },
+      "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "fillOpacity": 20 } }, "overrides": [] },
+      "targets": [
+        {
+          "expr": "sum by (outcome) (rate(serviceops_alerts_ingested_total[5m]))",
+          "legendFormat": "{{outcome}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Deployment ingestion outcomes",
+      "description": "duplicate = an at-least-once redelivery that the event_id constraint rejected.",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 10 },
+      "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "fillOpacity": 20 } }, "overrides": [] },
+      "targets": [
+        {
+          "expr": "sum by (outcome) (rate(serviceops_deployments_ingested_total[5m]))",
+          "legendFormat": "{{outcome}}"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Diagnosis quality and latency",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 18 }
+    },
+    {
+      "type": "stat",
+      "title": "Diagnoses with a correlated release",
+      "description": "Share of diagnoses that found a deployment inside the correlation window. A collapse to zero often means the deployment topic stopped producing, not that releases stopped breaking things.",
+      "gridPos": { "h": 7, "w": 6, "x": 0, "y": 19 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "orange", "value": 0.1 },
+              { "color": "green", "value": 0.3 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(serviceops_diagnoses_total{deployment_correlated=\"true\"}[30m])) / clamp_min(sum(rate(serviceops_diagnoses_total[30m])), 0.0001)",
+          "legendFormat": "correlated"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Diagnosis latency",
+      "gridPos": { "h": 7, "w": 10, "x": 6, "y": 19 },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(serviceops_diagnosis_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p95"
+        },
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(serviceops_diagnosis_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p50"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Incidents created by source",
+      "gridPos": { "h": 7, "w": 8, "x": 16, "y": 19 },
+      "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "fillOpacity": 20 } }, "overrides": [] },
+      "targets": [
+        {
+          "expr": "sum by (source) (rate(serviceops_incidents_opened_total[5m]))",
+          "legendFormat": "{{source}}"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Approvals",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 26 }
+    },
+    {
+      "type": "timeseries",
+      "title": "Remediation decisions",
+      "description": "A sustained rejection majority is a recommendation-quality signal, not an outage.",
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 27 },
+      "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "fillOpacity": 20 } }, "overrides": [] },
+      "targets": [
+        {
+          "expr": "sum by (status) (rate(serviceops_remediations_total[5m]))",
+          "legendFormat": "{{status}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "HTTP request latency by endpoint",
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 27 },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(http_server_requests_seconds_bucket{uri!~\"/actuator.*\"}[5m])) by (le, uri))",
+          "legendFormat": "{{uri}}"
+        }
+      ]
+    }
+  ]
+}
